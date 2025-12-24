@@ -1,155 +1,251 @@
-# StockFlow Pro - Backend API
+# 🚀 StockFlow Pro - Guide de Démarrage Rapide
 
-Backend FastAPI pour StockFlow Pro - Gestion de stock intelligente pour PME tunisiennes.
+## 📋 Vue d'ensemble
 
-## 🚀 Stack Technique
+StockFlow Pro est une solution de gestion de stock intelligente pour les PME tunisiennes, développée selon le cahier des charges strict.
 
-- **Framework**: FastAPI
-- **ORM**: Prisma (Python)
-- **Base de données**: PostgreSQL
-- **Cache**: Redis
-- **Authentification**: JWT (python-jose)
+**Phase actuelle**: MVP Phase 1 (Validation)
 
-## 📋 Prérequis
+## ✅ Fonctionnalités Implémentées (MVP)
 
-- Python 3.11+
-- Docker & Docker Compose
-- Node.js 18+ (pour Prisma CLI)
+- ✅ CRUD complet des Articles
+- ✅ Gestion des Mouvements de Stock (entrée/sortie/ajustement/retour)
+- ✅ Mise à jour automatique du stock
+- ✅ Dashboard simple avec KPIs
+- ✅ Alertes de stock faible
+- ✅ Authentification JWT sécurisée
+- ✅ Support 1 magasin par compte
+- ✅ Base de données PostgreSQL avec Prisma ORM
+- ✅ API REST complète avec FastAPI
 
-## 🛠️ Installation
+## 🛠️ Installation Rapide (Windows)
 
-### 1. Cloner le projet et installer les dépendances
+### Option 1: Avec Docker (Recommandé)
 
 ```bash
+# 1. Cloner et configurer
+git clone <repo>
+cd gestion_stock
+
+# 2. Lancer le setup automatique
+setup.bat
+
+# 3. Démarrer les services
+docker-compose up -d
+
+# 4. Créer la base de données
+cd backend
+prisma db push
+
+# 5. Insérer les données de test
+python seed.py
+```
+
+### Option 2: Installation Manuelle
+
+```bash
+# 1. Installer les dépendances
 cd backend
 pip install -r requirements.txt
-```
-
-### 2. Installer Prisma CLI
-
-```bash
 npm install -g prisma
-```
 
-### 3. Configurer les variables d'environnement
+# 2. Configurer l'environnement
+copy .env.example .env
+# Éditer .env avec vos paramètres
 
-```bash
-cp .env.example .env
-```
-
-Modifier le fichier `.env` avec vos configurations.
-
-### 4. Démarrer avec Docker Compose (Recommandé)
-
-```bash
-# Depuis la racine du projet
-docker-compose up -d
-```
-
-Cela démarre :
-- PostgreSQL (port 5432)
-- Redis (port 6379)
-- Backend API (port 8000)
-
-### 5. Générer le client Prisma
-
-```bash
-cd backend
+# 3. Générer le client Prisma
 prisma generate
-```
 
-### 6. Créer la base de données
+# 4. Démarrer PostgreSQL et Redis localement
 
-```bash
+# 5. Créer la base de données
 prisma db push
+
+# 6. Insérer les données de test
+python seed.py
+
+# 7. Lancer l'API
+uvicorn app.main:app --reload
 ```
 
-## 🎯 Démarrage Manuel (Sans Docker)
+## 🌐 Accès à l'Application
 
-```bash
-# Démarrer PostgreSQL et Redis localement
-# Puis :
-cd backend
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+- **API Backend**: http://localhost:8000
+- **Documentation Swagger**: http://localhost:8000/docs
+- **Documentation ReDoc**: http://localhost:8000/redoc
+- **Health Check**: http://localhost:8000/health
 
-## 📚 Documentation API
+## 🔑 Comptes de Test
 
-Une fois l'application démarrée, accédez à :
+Après avoir exécuté `seed.py`, vous aurez accès à :
 
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+| Rôle | Email | Mot de passe |
+|------|-------|--------------|
+| Patron | patron@epicerie.tn | password123 |
+| Employé | employe@epicerie.tn | password123 |
 
-## 🗂️ Structure du Projet
+## 📊 Structure de la Base de Données
 
-```
-backend/
-├── app/
-│   ├── api/              # Routes API
-│   │   ├── auth.py       # Authentification
-│   │   ├── articles.py   # Gestion articles
-│   │   ├── mouvements.py # Mouvements de stock
-│   │   └── dashboard.py  # Tableau de bord
-│   ├── core/             # Configuration
-│   │   ├── config.py     # Variables d'environnement
-│   │   ├── database.py   # Connexion Prisma
-│   │   └── security.py   # JWT & hashing
-│   ├── schemas/          # Modèles Pydantic
-│   ├── services/         # Logique métier
-│   └── main.py           # Point d'entrée FastAPI
-├── prisma/
-│   └── schema.prisma     # Schéma de base de données
-├── requirements.txt
-└── Dockerfile
-```
+Le schéma Prisma implémente le modèle de données complet du cahier des charges :
 
-## 🔑 Endpoints Principaux (MVP Phase 1)
+- **User** → Utilisateurs (patron, employé, comptable)
+- **Entreprise** → Entreprises clientes
+- **Magasin** → Points de vente/entrepôts
+- **Article** → Produits en stock
+- **MouvementStock** → Historique des mouvements
+- **Fournisseur** → Carnet d'adresses fournisseurs
+- **Vente** → Historique des ventes (pour IA future)
+- **Prevision** → Prévisions IA (Phase 2)
+- **JourFerie** → Jours fériés tunisiens
+- **AuditLog** → Traçabilité des actions
+
+## 🔌 Endpoints API Principaux
 
 ### Authentification
-- `POST /api/v1/auth/register` - Créer un compte
-- `POST /api/v1/auth/login` - Se connecter
+```http
+POST /api/v1/auth/register
+POST /api/v1/auth/login
+```
 
 ### Articles
-- `POST /api/v1/articles/` - Créer un article
-- `GET /api/v1/articles/{id}` - Récupérer un article
-- `GET /api/v1/articles/magasin/{magasin_id}` - Lister les articles
-- `GET /api/v1/articles/magasin/{magasin_id}/faibles` - Articles en stock faible
-- `PUT /api/v1/articles/{id}` - Modifier un article
-- `DELETE /api/v1/articles/{id}` - Supprimer un article
+```http
+POST   /api/v1/articles/
+GET    /api/v1/articles/{id}
+GET    /api/v1/articles/magasin/{magasin_id}
+GET    /api/v1/articles/magasin/{magasin_id}/faibles
+GET    /api/v1/articles/magasin/{magasin_id}/search?q=lait
+PUT    /api/v1/articles/{id}
+DELETE /api/v1/articles/{id}
+```
 
 ### Mouvements de Stock
-- `POST /api/v1/mouvements/` - Créer un mouvement (entrée/sortie)
-- `GET /api/v1/mouvements/article/{article_id}` - Historique d'un article
-- `GET /api/v1/mouvements/magasin/{magasin_id}` - Tous les mouvements
+```http
+POST /api/v1/mouvements/
+GET  /api/v1/mouvements/article/{article_id}
+GET  /api/v1/mouvements/magasin/{magasin_id}
+```
 
 ### Dashboard
-- `GET /api/v1/dashboard/magasin/{magasin_id}` - Statistiques du magasin
+```http
+GET /api/v1/dashboard/magasin/{magasin_id}
+```
+
+## 📝 Exemple d'Utilisation
+
+### 1. Se connecter
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "patron@epicerie.tn",
+    "password": "password123"
+  }'
+```
+
+### 2. Créer un article
+```bash
+curl -X POST http://localhost:8000/api/v1/articles/ \
+  -H "Authorization: Bearer <votre_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "CAF001",
+    "designation": "Café Moulu 250g",
+    "prix_achat": 4.5,
+    "prix_vente": 7.0,
+    "stock_min": 10,
+    "stock_max": 50,
+    "magasin_id": "<magasin_id>"
+  }'
+```
+
+### 3. Enregistrer une entrée de stock
+```bash
+curl -X POST http://localhost:8000/api/v1/mouvements/ \
+  -H "Authorization: Bearer <votre_token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "entree",
+    "quantite": 30,
+    "prix_unitaire": 4.5,
+    "article_id": "<article_id>",
+    "magasin_id": "<magasin_id>"
+  }'
+```
 
 ## 🧪 Tests
 
 ```bash
+cd backend
 pytest
 ```
 
-## 📦 Fonctionnalités MVP (Phase 1)
+## 📦 Technologies Utilisées
 
-✅ CRUD Articles  
-✅ Mouvements de stock (entrée/sortie/ajustement/retour)  
-✅ Mise à jour automatique du stock  
-✅ Dashboard simple (valeur stock, articles faibles)  
-✅ Alertes de seuil bas  
-✅ Authentification JWT  
-✅ 1 magasin par compte  
+| Composant | Technologie | Version |
+|-----------|-------------|---------|
+| Backend | FastAPI | 0.109.0 |
+| ORM | Prisma | 0.11.0 |
+| Base de données | PostgreSQL | 15 |
+| Cache | Redis | 7 |
+| Auth | JWT (python-jose) | 3.3.0 |
+| Validation | Pydantic | 2.5.3 |
 
-🚫 Exclus du MVP : IA, multi-magasin, scoring fournisseur
+## 🔒 Sécurité
 
-## 🔐 Sécurité
+- ✅ Mots de passe hashés avec bcrypt
+- ✅ Authentification JWT
+- ✅ Validation des données avec Pydantic
+- ✅ Protection CORS configurée
+- ✅ Variables d'environnement sécurisées
 
-- Mots de passe hashés avec bcrypt
-- Authentification JWT
-- HTTPS en production
-- Validation des données avec Pydantic
+## 📈 Prochaines Étapes (Roadmap)
 
-## 📝 Licence
+### Phase 2 - Intelligence (V1.0)
+- [ ] Module IA de prévision de la demande
+- [ ] Moteur de suggestions de commande
+- [ ] Alertes WhatsApp Business API
+- [ ] Gestion avancée des fournisseurs
+
+### Phase 3 - Conformité (V1.5)
+- [ ] Analytics "Cash Immobilisé"
+- [ ] Indicateurs TVA
+- [ ] Exports comptables avancés
+
+### Phase 4 - Échelle (V2.0)
+- [ ] Gestion multi-magasin
+- [ ] API publique
+- [ ] Workflow de validation
+
+## 🐛 Dépannage
+
+### Erreur de connexion à la base de données
+```bash
+# Vérifier que PostgreSQL est démarré
+docker ps
+
+# Recréer les containers
+docker-compose down
+docker-compose up -d
+```
+
+### Erreur Prisma Client
+```bash
+# Régénérer le client
+cd backend
+prisma generate
+```
+
+### Port 8000 déjà utilisé
+```bash
+# Changer le port dans docker-compose.yml
+ports:
+  - "8001:8000"
+```
+
+## 📞 Support
+
+Pour toute question ou problème, consultez la documentation complète dans `/backend/README.md`
+
+## 📄 Licence
 
 Propriétaire - StockFlow Pro © 2025
