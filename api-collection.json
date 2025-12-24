@@ -1,0 +1,189 @@
+{
+  "info": {
+    "name": "StockFlow Pro API",
+    "description": "Collection complète des endpoints API StockFlow Pro MVP",
+    "version": "1.0.0"
+  },
+  "variables": {
+    "baseUrl": "http://localhost:8000/api/v1",
+    "token": ""
+  },
+  "requests": [
+    {
+      "name": "Health Check",
+      "method": "GET",
+      "url": "http://localhost:8000/health"
+    },
+    {
+      "name": "Login - Patron",
+      "method": "POST",
+      "url": "{{baseUrl}}/auth/login",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "email": "patron@epicerie.tn",
+        "password": "password123"
+      }
+    },
+    {
+      "name": "Login - Employé",
+      "method": "POST",
+      "url": "{{baseUrl}}/auth/login",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "body": {
+        "email": "employe@epicerie.tn",
+        "password": "password123"
+      }
+    },
+    {
+      "name": "Créer Article",
+      "method": "POST",
+      "url": "{{baseUrl}}/articles/",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{token}}"
+      },
+      "body": {
+        "code": "CAF001",
+        "designation": "Café Moulu 250g",
+        "description": "Café arabica de qualité",
+        "prix_achat": 4.5,
+        "prix_vente": 7.0,
+        "stock_min": 10,
+        "stock_max": 50,
+        "unite": "paquet",
+        "magasin_id": "REMPLACER_PAR_MAGASIN_ID"
+      }
+    },
+    {
+      "name": "Lister Articles d'un Magasin",
+      "method": "GET",
+      "url": "{{baseUrl}}/articles/magasin/REMPLACER_PAR_MAGASIN_ID",
+      "headers": {
+        "Authorization": "Bearer {{token}}"
+      }
+    },
+    {
+      "name": "Articles en Stock Faible",
+      "method": "GET",
+      "url": "{{baseUrl}}/articles/magasin/REMPLACER_PAR_MAGASIN_ID/faibles",
+      "headers": {
+        "Authorization": "Bearer {{token}}"
+      }
+    },
+    {
+      "name": "Rechercher Articles",
+      "method": "GET",
+      "url": "{{baseUrl}}/articles/magasin/REMPLACER_PAR_MAGASIN_ID/search?q=lait",
+      "headers": {
+        "Authorization": "Bearer {{token}}"
+      }
+    },
+    {
+      "name": "Récupérer un Article",
+      "method": "GET",
+      "url": "{{baseUrl}}/articles/REMPLACER_PAR_ARTICLE_ID",
+      "headers": {
+        "Authorization": "Bearer {{token}}"
+      }
+    },
+    {
+      "name": "Modifier Article",
+      "method": "PUT",
+      "url": "{{baseUrl}}/articles/REMPLACER_PAR_ARTICLE_ID",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{token}}"
+      },
+      "body": {
+        "prix_vente": 8.0,
+        "stock_min": 15
+      }
+    },
+    {
+      "name": "Supprimer Article",
+      "method": "DELETE",
+      "url": "{{baseUrl}}/articles/REMPLACER_PAR_ARTICLE_ID",
+      "headers": {
+        "Authorization": "Bearer {{token}}"
+      }
+    },
+    {
+      "name": "Créer Mouvement - Entrée",
+      "method": "POST",
+      "url": "{{baseUrl}}/mouvements/",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{token}}"
+      },
+      "body": {
+        "type": "entree",
+        "quantite": 50,
+        "prix_unitaire": 4.5,
+        "motif": "Réapprovisionnement",
+        "reference_doc": "BL-2025-001",
+        "article_id": "REMPLACER_PAR_ARTICLE_ID",
+        "magasin_id": "REMPLACER_PAR_MAGASIN_ID"
+      }
+    },
+    {
+      "name": "Créer Mouvement - Sortie",
+      "method": "POST",
+      "url": "{{baseUrl}}/mouvements/",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{token}}"
+      },
+      "body": {
+        "type": "sortie",
+        "quantite": 10,
+        "motif": "Vente",
+        "article_id": "REMPLACER_PAR_ARTICLE_ID",
+        "magasin_id": "REMPLACER_PAR_MAGASIN_ID"
+      }
+    },
+    {
+      "name": "Créer Mouvement - Ajustement",
+      "method": "POST",
+      "url": "{{baseUrl}}/mouvements/",
+      "headers": {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer {{token}}"
+      },
+      "body": {
+        "type": "ajustement",
+        "quantite": 45,
+        "motif": "Inventaire physique",
+        "article_id": "REMPLACER_PAR_ARTICLE_ID",
+        "magasin_id": "REMPLACER_PAR_MAGASIN_ID"
+      }
+    },
+    {
+      "name": "Historique Mouvements d'un Article",
+      "method": "GET",
+      "url": "{{baseUrl}}/mouvements/article/REMPLACER_PAR_ARTICLE_ID",
+      "headers": {
+        "Authorization": "Bearer {{token}}"
+      }
+    },
+    {
+      "name": "Tous les Mouvements d'un Magasin",
+      "method": "GET",
+      "url": "{{baseUrl}}/mouvements/magasin/REMPLACER_PAR_MAGASIN_ID",
+      "headers": {
+        "Authorization": "Bearer {{token}}"
+      }
+    },
+    {
+      "name": "Dashboard - Statistiques Magasin",
+      "method": "GET",
+      "url": "{{baseUrl}}/dashboard/magasin/REMPLACER_PAR_MAGASIN_ID",
+      "headers": {
+        "Authorization": "Bearer {{token}}"
+      }
+    }
+  ]
+}

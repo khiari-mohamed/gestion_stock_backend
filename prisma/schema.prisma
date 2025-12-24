@@ -1,0 +1,569 @@
+generator client {
+  provider = "prisma-client-py"
+  interface = "asyncio"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ CORE ENTITIES ============
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  password_hash String
+  nom           String
+  prenom        String
+  telephone     String?
+  langue        Langue    @default(FR)
+  role          Role      @default(EMPLOYE)
+  is_active     Boolean   @default(true)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  last_login    DateTime?
+  
+  // Relations
+  entreprise_id String
+  entreprise    Entreprise @relation(fields: [entreprise_id], references: [id], onDelete: Cascade)
+  audit_logs    AuditLog[]
+  
+  @@index([entreprise_id])
+  @@map("users")
+}
+
+model Entreprise {
+  id              String        @id @default(uuid())
+  nom             String
+  matricule_fiscal String?      @unique
+  adresse         String?
+  ville           String?
+  code_postal     String?
+  telephone       String?
+  email           String?
+  devise_principale Devise      @default(TND)
+  devise_secondaire Devise?
+  created_at      DateTime      @default(now())
+  updated_at      DateTime      @updatedAt
+  
+  // Relations
+  users           User[]
+  magasins        Magasin[]
+  fournisseurs    Fournisseur[]
+  alertes_config  AlerteConfig[]
+  notifications   Notification[]
+  jours_feries    JourFerieEntreprise[]
+  
+  @@map("entreprises")
+}
+
+model Magasin {
+  id           String    @id @default(uuid())
+  nom          String
+  code         String    @unique
+  adresse      String?
+  ville        String?
+  telephone    String?
+  is_principal Boolean   @default(true)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+  
+  // Relations
+  entreprise_id String
+  entreprise    Entreprise @relation(fields: [entreprise_id], references: [id], onDelete: Cascade)
+  
+  articles       Article[]
+  mouvements     MouvementStock[]
+  transferts_envoi TransfertStock[] @relation("TransfertEnvoi")
+  transferts_reception TransfertStock[] @relation("TransfertReception")
+  
+  @@index([entreprise_id])
+  @@map("magasins")
+}
+
+// ============ INVENTORY MANAGEMENT ============
+
+model Article {
+  id              String    @id @default(uuid())
+  code            String
+  designation     String
+  description     String?
+  code_barre      String?   @unique
+  unite           Unite     @default(UNIT)
+  categorie       String?   // Ex: alimentaire, electronique, etc.
+  prix_achat      Float     @default(0)
+  prix_vente      Float     @default(0)
+  tva_taux        Float?    @default(0.19) // TVA tunisienne par défaut
+  stock_actuel    Int       @default(0)
+  stock_min       Int       @default(0)
+  stock_max       Int       @default(100)
+  stock_securite  Int       @default(5)    // Stock de sécurité
+  date_peremption DateTime?
+  image_url       String?
+  is_active       Boolean   @default(true)
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  
+  // Relations
+  magasin_id      String
+  magasin         Magasin   @relation(fields: [magasin_id], references: [id], onDelete: Cascade)
+  
+  mouvements      MouvementStock[]
+  ventes          Vente[]
+  previsions      Prevision[]
+  alertes         Alerte[]
+  
+  @@unique([code, magasin_id])
+  @@index([magasin_id])
+  @@index([code_barre])
+  @@index([categorie])
+  @@map("articles")
+}
+
+model MouvementStock {
+  id              String        @id @default(uuid())
+  type            TypeMouvement // entree, sortie, ajustement, retour, inventaire
+  quantite        Int
+  prix_unitaire   Float?
+  valeur_totale   Float?        // Calculée: quantite * prix_unitaire
+  motif           String?
+  reference_doc   String?       // Numéro bon de livraison/facture
+  photo_doc_url   String?       // Photo du document
+  date_mouvement  DateTime      @default(now())
+  created_at      DateTime      @default(now())
+  created_by      String?       // User ID
+  
+  // Relations
+  article_id      String
+  article         Article       @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  
+  magasin_id      String
+  magasin         Magasin       @relation(fields: [magasin_id], references: [id], onDelete: Cascade)
+  
+  fournisseur_id  String?
+  fournisseur     Fournisseur?  @relation(fields: [fournisseur_id], references: [id], onDelete: SetNull)
+  
+  bon_commande_id String?
+  bon_commande    BonCommande?  @relation(fields: [bon_commande_id], references: [id], onDelete: SetNull)
+  
+  @@index([article_id])
+  @@index([magasin_id])
+  @@index([date_mouvement])
+  @@index([type])
+  @@map("mouvements_stock")
+}
+
+model TransfertStock {
+  id                String    @id @default(uuid())
+  reference         String    @unique // TRF-2024-001
+  statut            StatutTransfert @default(EN_ATTENTE)
+  quantite          Int
+  date_transfert    DateTime?
+  date_reception    DateTime?
+  notes             String?
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
+  
+  // Relations
+  article_id        String
+  article           Article   @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  
+  magasin_origine_id  String
+  magasin_origine     Magasin @relation("TransfertEnvoi", fields: [magasin_origine_id], references: [id])
+  
+  magasin_destination_id String
+  magasin_destination    Magasin @relation("TransfertReception", fields: [magasin_destination_id], references: [id])
+  
+  @@index([article_id])
+  @@index([magasin_origine_id])
+  @@index([magasin_destination_id])
+  @@index([created_at])
+  @@map("transferts_stock")
+}
+
+// ============ AI & FORECASTING MODULE ============
+
+model Vente {
+  id              String    @id @default(uuid())
+  quantite        Int
+  prix_unitaire   Float
+  montant_total   Float
+  date_vente      DateTime  @default(now())
+  jour_semaine    Int       // 0=lundi, 6=dimanche
+  semaine_annee   Int       // ISO week number
+  created_at      DateTime  @default(now())
+  
+  // Relations
+  article_id      String
+  article         Article   @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  
+  magasin_id      String
+  magasin         Magasin   @relation(fields: [magasin_id], references: [id], onDelete: Cascade)
+  
+  @@index([article_id])
+  @@index([magasin_id])
+  @@index([date_vente])
+  @@index([semaine_annee])
+  @@map("ventes")
+}
+
+model Prevision {
+  id                String    @id @default(uuid())
+  date_calcul       DateTime  @default(now())
+  date_periode      DateTime  // Début de la semaine prévue
+  date_fin_periode  DateTime  // Fin de la semaine prévue
+  quantite_prevue   Float
+  confiance         Float     // 0.0 à 1.0
+  metriques         Json?     // {mape: 0.15, wmape: 0.12, coverage: 0.85}
+  algorithme        String    @default("moving_average") // moving_average, prophet, etc.
+  version_modele    String    @default("1.0")
+  created_at        DateTime  @default(now())
+  
+  // Relations
+  article_id        String
+  article           Article   @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  
+  magasin_id        String
+  magasin           Magasin   @relation(fields: [magasin_id], references: [id], onDelete: Cascade)
+  
+  @@unique([article_id, magasin_id, date_periode])
+  @@index([article_id])
+  @@index([magasin_id])
+  @@index([date_periode])
+  @@map("previsions")
+}
+
+// ============ SUPPLIER MANAGEMENT ============
+
+model Fournisseur {
+  id              String    @id @default(uuid())
+  nom             String
+  type            TypeFournisseur @default(FORMEL)
+  telephone       String?
+  email           String?
+  adresse         String?
+  ville           String?
+  matricule_fiscal String?
+  delai_livraison Int?      // en jours
+  score_fiabilite Float?    @default(5.0) // sur 10
+  notes           String?
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  
+  // Relations
+  entreprise_id   String
+  entreprise      Entreprise @relation(fields: [entreprise_id], references: [id], onDelete: Cascade)
+  
+  mouvements      MouvementStock[]
+  bons_commande   BonCommande[]
+  historiques_prix HistoriquePrix[]
+  
+  @@index([entreprise_id])
+  @@index([type])
+  @@map("fournisseurs")
+}
+
+model HistoriquePrix {
+  id              String    @id @default(uuid())
+  prix_achat      Float
+  date_effet      DateTime  @default(now())
+  created_at      DateTime  @default(now())
+  
+  // Relations
+  article_id      String
+  article         Article   @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  
+  fournisseur_id  String
+  fournisseur     Fournisseur @relation(fields: [fournisseur_id], references: [id], onDelete: Cascade)
+  
+  @@unique([article_id, fournisseur_id, date_effet])
+  @@index([article_id])
+  @@index([fournisseur_id])
+  @@index([date_effet])
+  @@map("historiques_prix")
+}
+
+model BonCommande {
+  id                String        @id @default(uuid())
+  reference         String        @unique // BC-2024-001
+  statut            StatutCommande @default(BROUILLON)
+  date_commande     DateTime?
+  date_livraison_prevue DateTime?
+  date_livraison_reelle DateTime?
+  montant_total     Float?        @default(0)
+  notes             String?
+  created_at        DateTime      @default(now())
+  updated_at        DateTime      @updatedAt
+  
+  // Relations
+  entreprise_id     String
+  entreprise        Entreprise    @relation(fields: [entreprise_id], references: [id], onDelete: Cascade)
+  
+  fournisseur_id    String
+  fournisseur       Fournisseur   @relation(fields: [fournisseur_id], references: [id], onDelete: Cascade)
+  
+  lignes            LigneCommande[]
+  mouvements        MouvementStock[]
+  
+  @@index([entreprise_id])
+  @@index([fournisseur_id])
+  @@index([statut])
+  @@index([date_commande])
+  @@map("bons_commande")
+}
+
+model LigneCommande {
+  id              String    @id @default(uuid())
+  quantite_commandee Int
+  quantite_recue  Int?      @default(0)
+  prix_unitaire   Float
+  montant_total   Float
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  
+  // Relations
+  bon_commande_id String
+  bon_commande    BonCommande @relation(fields: [bon_commande_id], references: [id], onDelete: Cascade)
+  
+  article_id      String
+  article         Article   @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  
+  @@unique([bon_commande_id, article_id])
+  @@index([bon_commande_id])
+  @@index([article_id])
+  @@map("lignes_commande")
+}
+
+// ============ NOTIFICATIONS & ALERTS ============
+
+model Alerte {
+  id              String      @id @default(uuid())
+  type            TypeAlerte  // rupture, peremption, seuil_bas, seuil_haut
+  niveau          NiveauAlerte @default(MOYEN)
+  message         String
+  est_vue         Boolean     @default(false)
+  est_resolue     Boolean     @default(false)
+  date_alerte     DateTime    @default(now())
+  date_resolution DateTime?
+  created_at      DateTime    @default(now())
+  
+  // Relations
+  article_id      String?
+  article         Article?    @relation(fields: [article_id], references: [id], onDelete: Cascade)
+  
+  magasin_id      String
+  magasin         Magasin     @relation(fields: [magasin_id], references: [id], onDelete: Cascade)
+  
+  @@index([article_id])
+  @@index([magasin_id])
+  @@index([type])
+  @@index([est_vue])
+  @@index([date_alerte])
+  @@map("alertes")
+}
+
+model AlerteConfig {
+  id                  String      @id @default(uuid())
+  type_alerte         TypeAlerte
+  seuil               Float?      // Pourcentage ou valeur absolue
+  canal               CanalAlerte @default(EMAIL) // email, whatsapp, les_deux
+  active              Boolean     @default(true)
+  created_at          DateTime    @default(now())
+  updated_at          DateTime    @updatedAt
+  
+  // Relations
+  entreprise_id       String
+  entreprise          Entreprise @relation(fields: [entreprise_id], references: [id], onDelete: Cascade)
+  
+  @@unique([entreprise_id, type_alerte])
+  @@index([entreprise_id])
+  @@map("alertes_config")
+}
+
+model Notification {
+  id              String      @id @default(uuid())
+  type            TypeNotification // alerte, systeme, info
+  titre           String
+  message         String
+  canal           CanalAlerte // email, whatsapp, in_app
+  statut          StatutNotification @default(EN_ATTENTE)
+  destinaire      String?     // email ou numéro WhatsApp
+  date_envoi      DateTime?
+  date_reception  DateTime?
+  erreur          String?
+  created_at      DateTime    @default(now())
+  
+  // Relations
+  entreprise_id   String
+  entreprise      Entreprise @relation(fields: [entreprise_id], references: [id], onDelete: Cascade)
+  
+  alerte_id       String?
+  alerte          Alerte?    @relation(fields: [alerte_id], references: [id], onDelete: Cascade)
+  
+  @@index([entreprise_id])
+  @@index([statut])
+  @@index([created_at])
+  @@map("notifications")
+}
+
+// ============ CALENDAR & HOLIDAYS ============
+
+model JourFerie {
+  id              String    @id @default(uuid())
+  date            DateTime  @unique
+  nom             String
+  type            TypeFerie @default(NATIONALE) // nationale, religieuse, locale
+  impact_estime   Float?    @default(1.0) // 1.0 = normal, 1.5 = +50% de ventes, etc.
+  created_at      DateTime  @default(now())
+  
+  @@index([date])
+  @@map("jours_feries")
+}
+
+model JourFerieEntreprise {
+  id              String    @id @default(uuid())
+  date            DateTime
+  nom             String
+  impact_estime   Float?    @default(1.0)
+  created_at      DateTime  @default(now())
+  
+  // Relations
+  entreprise_id   String
+  entreprise      Entreprise @relation(fields: [entreprise_id], references: [id], onDelete: Cascade)
+  
+  @@unique([entreprise_id, date])
+  @@index([entreprise_id])
+  @@index([date])
+  @@map("jours_feries_entreprise")
+}
+
+// ============ AUDIT & SYSTEM ============
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  user_id     String?
+  user_email  String?
+  action      String    // create, update, delete, login, etc.
+  entity_type String    // Article, MouvementStock, etc.
+  entity_id   String?
+  anciennes_valeurs Json?
+  nouvelles_valeurs Json?
+  details     String?
+  ip_address  String?
+  user_agent  String?
+  created_at  DateTime  @default(now())
+  
+  // Relations
+  entreprise_id String?
+  entreprise    Entreprise? @relation(fields: [entreprise_id], references: [id], onDelete: Cascade)
+  
+  @@index([user_id])
+  @@index([entreprise_id])
+  @@index([entity_type])
+  @@index([created_at])
+  @@map("audit_logs")
+}
+
+// ============ ENUMS ============
+
+enum Langue {
+  FR
+  AR
+}
+
+enum Role {
+  PATRON
+  GERANT
+  EMPLOYE
+  COMPTABLE
+}
+
+enum Devise {
+  TND
+  EUR
+  USD
+}
+
+enum Unite {
+  UNIT
+  KG
+  LITER
+  METER
+  BOX
+  PACK
+}
+
+enum TypeMouvement {
+  ENTREE
+  SORTIE
+  AJUSTEMENT
+  RETOUR
+  INVENTAIRE
+  TRANSFERT
+}
+
+enum TypeFournisseur {
+  FORMEL
+  INFORMEL
+}
+
+enum StatutTransfert {
+  EN_ATTENTE
+  EN_COURS
+  RECU
+  ANNULE
+}
+
+enum StatutCommande {
+  BROUILLON
+  EN_ATTENTE
+  CONFIRMEE
+  PARTIELLEMENT_LIVREE
+  LIVREE
+  ANNULEE
+}
+
+enum TypeAlerte {
+  RUPTURE
+  PEREMPTION
+  SEUIL_BAS
+  SEUIL_HAUT
+  COMMANDE_A_PASSER
+  FOURNISSEUR_RETARD
+}
+
+enum NiveauAlerte {
+  FAIBLE
+  MOYEN
+  ELEVE
+  CRITIQUE
+}
+
+enum CanalAlerte {
+  EMAIL
+  WHATSAPP
+  LES_DEUX
+  IN_APP
+}
+
+enum TypeNotification {
+  ALERTE
+  SYSTEME
+  INFO
+  RAPPORT
+}
+
+enum StatutNotification {
+  EN_ATTENTE
+  ENVOYEE
+  ECHEC
+  RECUE
+}
+
+enum TypeFerie {
+  NATIONALE
+  RELIGIEUSE
+  LOCALE
+  CUSTOM
+}
