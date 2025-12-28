@@ -7,6 +7,23 @@ def calculate_stock_value(articles: List[Dict]) -> float:
     """
     return sum(a.get("stock_actuel", 0) * a.get("prix_achat", 0) for a in articles)
 
+def calculate_stock_value_with_tva(articles: List[Dict]) -> Dict:
+    """
+    Calculer la valeur du stock avec TVA tunisienne
+    """
+    valeur_ht = sum(a.get("stock_actuel", 0) * a.get("prix_achat", 0) for a in articles)
+    tva = sum(
+        a.get("stock_actuel", 0) * a.get("prix_achat", 0) * a.get("tva_taux", 0.19)
+        for a in articles
+    )
+    valeur_ttc = valeur_ht + tva
+    
+    return {
+        "valeur_ht": round(valeur_ht, 3),
+        "tva": round(tva, 3),
+        "valeur_ttc": round(valeur_ttc, 3)
+    }
+
 def calculate_marge(prix_achat: float, prix_vente: float) -> float:
     """
     Calculer la marge en pourcentage

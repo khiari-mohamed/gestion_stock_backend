@@ -54,6 +54,8 @@ model Entreprise {
   alertes_config  AlerteConfig[]
   notifications   Notification[]
   jours_feries    JourFerieEntreprise[]
+  bons_commande   BonCommande[]
+  audit_logs      AuditLog[]
   
   @@map("entreprises")
 }
@@ -77,6 +79,9 @@ model Magasin {
   mouvements     MouvementStock[]
   transferts_envoi TransfertStock[] @relation("TransfertEnvoi")
   transferts_reception TransfertStock[] @relation("TransfertReception")
+  ventes         Vente[]
+  previsions     Prevision[]
+  alertes        Alerte[]
   
   @@index([entreprise_id])
   @@map("magasins")
@@ -113,6 +118,9 @@ model Article {
   ventes          Vente[]
   previsions      Prevision[]
   alertes         Alerte[]
+  transferts      TransfertStock[]
+  historiques_prix HistoriquePrix[]
+  lignes_commande LigneCommande[]
   
   @@unique([code, magasin_id])
   @@index([magasin_id])
@@ -354,6 +362,7 @@ model Alerte {
   
   magasin_id      String
   magasin         Magasin     @relation(fields: [magasin_id], references: [id], onDelete: Cascade)
+  notifications   Notification[]
   
   @@index([article_id])
   @@index([magasin_id])
@@ -443,6 +452,7 @@ model JourFerieEntreprise {
 model AuditLog {
   id          String    @id @default(uuid())
   user_id     String?
+  user        User?     @relation(fields: [user_id], references: [id], onDelete: SetNull)
   user_email  String?
   action      String    // create, update, delete, login, etc.
   entity_type String    // Article, MouvementStock, etc.

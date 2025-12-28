@@ -3,7 +3,7 @@ Jobs de synchronisation pour le mode offline mobile
 """
 from typing import List, Dict
 from datetime import datetime
-from app.core.database import get_db
+from app.core.database import prisma
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,47 +15,75 @@ async def sync_offline_data(user_id: str, sync_data: Dict) -> Dict:
     
     Args:
         user_id: ID de l'utilisateur
-        sync_data: Données à synchroniser (mouvements, inventaires, etc.)
+        sync_data: Données à synchroniser (mouvements, ventes, inventaires, etc.)
     
     Returns:
         Résultat de la synchronisation
     """
-    db = await get_db()
-    
     synced = {
         "mouvements": 0,
         "articles": 0,
+        "ventes": 0,
         "errors": []
     }
     
     # Synchroniser les mouvements de stock
-    if "mouvements" in sync_data:
+    if "mouvements" in sync_data and sync_data["mouvements"]:
         for mouvement in sync_data["mouvements"]:
             try:
-                await db.mouvementstock.create(
+                await prisma.mouvementstock.create(
                     data={
-                        **mouvement,
-                        "created_by": user_id,
-                        "created_at": datetime.now()
+                        "type": mouvement["type"],
+                        "article_id": mouvement["article_id"],
+                        "magasin_id": mouvement["magasin_id"],
+                        "quantite": mouvement["quantite"],
+                        "prix_unitaire": mouvement.get("prix_unitaire"),
+                        "motif": mouvement.get("motif"),
+                        "date_mouvement": mouvement["date_mouvement"],
+                        "created_by": user_id
                     }
                 )
                 synced["mouvements"] += 1
             except Exception as e:
                 logger.error(f"Sync error for mouvement: {str(e)}")
-                synced["errors"].append(str(e))
+                synced["errors"].append(f"Mouvement: {str(e)}")
+    
+    # Synchroniser les ventes
+    if "ventes" in sync_data and sync_data["ventes"]:
+        for vente in sync_data["ventes"]:
+            try:
+                montant_total = vente["quantite"] * vente["prix_unitaire"]
+                date_vente = vente["date_vente"]
+                
+                await prisma.vente.create(
+                    data={
+                        "article_id": vente["article_id"],
+                        "magasin_id": vente["magasin_id"],
+                        "quantite": vente["quantite"],
+                        "prix_unitaire": vente["prix_unitaire"],
+                        "montant_total": montant_total,
+                        "date_vente": date_vente,
+                        "jour_semaine": date_vente.weekday(),
+                        "semaine_annee": date_vente.isocalendar()[1]
+                    }
+                )
+                synced["ventes"] += 1
+            except Exception as e:
+                logger.error(f"Sync error for vente: {str(e)}")
+                synced["errors"].append(f"Vente: {str(e)}")
     
     # Synchroniser les articles modifiés
-    if "articles" in sync_data:
+    if "articles" in sync_data and sync_data["articles"]:
         for article in sync_data["articles"]:
             try:
-                await db.article.update(
+                await prisma.article.update(
                     where={"id": article["id"]},
                     data=article["data"]
                 )
                 synced["articles"] += 1
             except Exception as e:
                 logger.error(f"Sync error for article: {str(e)}")
-                synced["errors"].append(str(e))
+                synced["errors"].append(f"Article {article['id']}: {str(e)}")
     
     return synced
 
@@ -71,10 +99,8 @@ async def get_sync_data(magasin_id: str, last_sync: datetime) -> Dict:
     Returns:
         Données à synchroniser vers le mobile
     """
-    db = await get_db()
-    
     # Articles modifiés
-    articles = await db.article.find_many(
+    articles = await prisma.article.find_many(
         where={
             "magasin_id": magasin_id,
             "updated_at": {"gte": last_sync}
@@ -82,7 +108,7 @@ async def get_sync_data(magasin_id: str, last_sync: datetime) -> Dict:
     )
     
     # Mouvements récents
-    mouvements = await db.mouvementstock.find_many(
+    mouvements = await prisma.mouvementstock.find_many(
         where={
             "magasin_id": magasin_id,
             "created_at": {"gte": last_sync}

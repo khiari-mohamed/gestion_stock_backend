@@ -3,6 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.database import connect_db, disconnect_db
 from app.api.v1.api import api_router
+from app.core.middleware import LoggingMiddleware, ErrorHandlerMiddleware
+from app.core.rate_limiter import RateLimitMiddleware
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,6 +31,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Rate Limiting (60 requêtes/minute)
+app.add_middleware(RateLimitMiddleware, requests_per_minute=60)
+
+# Logging
+app.add_middleware(LoggingMiddleware)
+
+# Error Handler
+app.add_middleware(ErrorHandlerMiddleware)
 
 # Routes API v1
 app.include_router(api_router, prefix="/api/v1")

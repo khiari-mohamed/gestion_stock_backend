@@ -2,6 +2,7 @@
 Jobs asynchrones pour l'envoi de notifications
 """
 from typing import List
+from datetime import datetime
 from app.core.database import get_db
 from app.services.whatsapp_service import WhatsAppService
 from app.services.notification_service import NotificationService

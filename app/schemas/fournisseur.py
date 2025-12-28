@@ -1,6 +1,7 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime
+from app.utils.validators import validate_phone_tunisie, validate_matricule_fiscal
 
 
 class FournisseurBase(BaseModel):
@@ -13,6 +14,20 @@ class FournisseurBase(BaseModel):
     matricule_fiscal: Optional[str] = None
     delai_livraison: Optional[int] = None
     notes: Optional[str] = None
+    
+    @field_validator('telephone')
+    @classmethod
+    def validate_phone(cls, v):
+        if v and not validate_phone_tunisie(v):
+            raise ValueError('Numéro de téléphone tunisien invalide')
+        return v
+    
+    @field_validator('matricule_fiscal')
+    @classmethod
+    def validate_matricule(cls, v):
+        if v and not validate_matricule_fiscal(v):
+            raise ValueError('Matricule fiscal tunisien invalide (format: 1234567A)')
+        return v
 
 
 class FournisseurCreate(FournisseurBase):

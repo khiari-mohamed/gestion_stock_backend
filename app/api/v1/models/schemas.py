@@ -33,8 +33,21 @@ class UserResponse(UserBase):
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: Optional[str] = None
     token_type: str = "bearer"
-    user: UserResponse
+    expires_in: int = 1800  # 30 minutes in seconds
+    user: Optional[dict] = None
+
+class TokenRefresh(BaseModel):
+    refresh_token: str
+
+class PasswordReset(BaseModel):
+    email: EmailStr
+
+class PasswordResetConfirm(BaseModel):
+    email: EmailStr
+    token: str
+    new_password: str = Field(..., min_length=6)
 
 # ============================================
 # ARTICLE SCHEMAS

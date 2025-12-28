@@ -80,3 +80,14 @@ class ArticleService:
             },
             take=50
         )
+    
+    @staticmethod
+    async def get_by_barcode(code_barre: str, magasin_id: str) -> Optional[Article]:
+        """Recherche rapide par code-barres pour scan mobile"""
+        return await prisma.article.find_first(
+            where={
+                "code_barre": code_barre,
+                "magasin_id": magasin_id,
+                "is_active": True
+            }
+        )

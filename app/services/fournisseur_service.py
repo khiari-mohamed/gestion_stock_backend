@@ -48,3 +48,11 @@ class FournisseurService:
     async def delete_fournisseur(fournisseur_id: str) -> bool:
         await prisma.fournisseur.delete(where={"id": fournisseur_id})
         return True
+    
+    @staticmethod
+    async def update_score(fournisseur_id: str, score: float):
+        """Mettre à jour le score de fiabilité"""
+        return await prisma.fournisseur.update(
+            where={"id": fournisseur_id},
+            data={"score_fiabilite": score}
+        )

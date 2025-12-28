@@ -1,6 +1,6 @@
 from typing import List, Dict
 from datetime import datetime, timedelta
-from app.core.database import get_db
+from app.core.database import prisma
 from app.services.whatsapp_service import WhatsAppService
 import logging
 
@@ -20,10 +20,8 @@ class InventoryService:
         Returns:
             Dict avec statistiques et alertes générées
         """
-        db = await get_db()
-        
         # Récupérer tous les articles actifs
-        articles = await db.article.find_many(
+        articles = await prisma.article.find_many(
             where={"magasin_id": magasin_id, "is_active": True}
         )
         
@@ -90,10 +88,8 @@ class InventoryService:
         message: str
     ):
         """Créer une alerte dans la base de données"""
-        db = await get_db()
-        
         try:
-            await db.alerte.create(
+            await prisma.alerte.create(
                 data={
                     "article_id": article_id,
                     "magasin_id": magasin_id,
@@ -109,9 +105,7 @@ class InventoryService:
     
     async def calculate_stock_value(self, magasin_id: str) -> Dict:
         """Calculer la valeur totale du stock (Cash immobilisé)"""
-        db = await get_db()
-        
-        articles = await db.article.find_many(
+        articles = await prisma.article.find_many(
             where={"magasin_id": magasin_id, "is_active": True}
         )
         
@@ -130,12 +124,10 @@ class InventoryService:
     
     async def get_slow_moving_items(self, magasin_id: str, days: int = 90) -> List:
         """Identifier les articles à rotation lente (stock dormant)"""
-        db = await get_db()
-        
         date_limite = datetime.now() - timedelta(days=days)
         
         # Articles sans mouvement récent
-        articles = await db.article.find_many(
+        articles = await prisma.article.find_many(
             where={
                 "magasin_id": magasin_id,
                 "is_active": True,
@@ -146,7 +138,7 @@ class InventoryService:
         slow_items = []
         for article in articles:
             # Vérifier s'il y a eu des mouvements récents
-            recent_movements = await db.mouvementstock.count(
+            recent_movements = await prisma.mouvementstock.count(
                 where={
                     "article_id": article.id,
                     "date_mouvement": {"gte": date_limite},

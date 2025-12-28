@@ -1,10 +1,6 @@
-"""
-Service IA pour la prévision de la demande
-Version MVP: Moyenne Mobile Pondérée
-"""
 from typing import Dict, Optional, List
 from datetime import datetime, timedelta
-from app.core.database import get_db
+from app.core.database import prisma
 import numpy as np
 import logging
 
@@ -35,12 +31,10 @@ class AIForecastService:
         Returns:
             Dict avec prévision ou None si données insuffisantes
         """
-        db = await get_db()
-        
-        # Récupérer l'historique des ventes (4 dernières semaines minimum)
+        # Récupérer l'historique des ventes (8 dernières semaines)
         date_debut = datetime.now() - timedelta(weeks=8)
         
-        ventes = await db.vente.find_many(
+        ventes = await prisma.vente.find_many(
             where={
                 "article_id": article_id,
                 "magasin_id": magasin_id,
@@ -72,7 +66,7 @@ class AIForecastService:
         date_fin_periode = date_periode + timedelta(days=horizon_jours)
         
         # Sauvegarder la prévision
-        prevision = await db.prevision.upsert(
+        prevision = await prisma.prevision.upsert(
             where={
                 "article_id_magasin_id_date_periode": {
                     "article_id": article_id,
@@ -139,12 +133,10 @@ class AIForecastService:
         Returns:
             Liste d'articles à commander avec quantités suggérées
         """
-        db = await get_db()
-        
-        # Récupérer les articles avec prévisions récentes
+        # Récupérer les prévisions récentes
         date_limite = datetime.now() - timedelta(days=1)
         
-        previsions = await db.prevision.find_many(
+        previsions = await prisma.prevision.find_many(
             where={
                 "magasin_id": magasin_id,
                 "date_calcul": {"gte": date_limite}
@@ -181,3 +173,36 @@ class AIForecastService:
         suggestions.sort(key=lambda x: (x["priorite"] == "HAUTE", -x["stock_actuel"]), reverse=True)
         
         return suggestions
+    
+    async def get_previsions_by_article(self, article_id: str, limit: int = 10) -> List:
+        """Récupérer les prévisions d'un article"""
+        return await prisma.prevision.find_many(
+            where={"article_id": article_id},
+            order={"date_calcul": "desc"},
+            take=limit
+        )
+    
+    async def calculate_all_forecasts(self, magasin_id: str) -> Dict:
+        """Calculer les prévisions pour tous les articles d'un magasin"""
+        articles = await prisma.article.find_many(
+            where={"magasin_id": magasin_id, "is_active": True}
+        )
+        
+        total = 0
+        success = 0
+        skipped = 0
+        
+        for article in articles:
+            total += 1
+            result = await self.generate_forecast(article.id, magasin_id)
+            if result:
+                success += 1
+            else:
+                skipped += 1
+        
+        return {
+            "total_articles": total,
+            "previsions_generees": success,
+            "articles_ignores": skipped,
+            "timestamp": datetime.now()
+        }

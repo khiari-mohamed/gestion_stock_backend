@@ -1,6 +1,6 @@
 from typing import Dict
 from app.core.database import prisma
-from app.utils.helpers import calculate_stock_value
+from app.utils.helpers import calculate_stock_value, calculate_stock_value_with_tva
 
 class DashboardService:
     
@@ -17,13 +17,15 @@ class DashboardService:
         articles_dict = [
             {
                 "stock_actuel": a.stock_actuel,
-                "prix_achat": a.prix_achat
+                "prix_achat": a.prix_achat,
+                "tva_taux": a.tva_taux or 0.19
             }
             for a in articles
         ]
         
         # Calculer la valeur totale du stock
         valeur_stock_total = calculate_stock_value(articles_dict)
+        valeur_avec_tva = calculate_stock_value_with_tva(articles_dict)
         
         # Articles avec stock faible
         articles_faibles = [
@@ -39,6 +41,9 @@ class DashboardService:
         
         return {
             "valeur_stock_total_dt": round(valeur_stock_total, 2),
+            "valeur_stock_ht": valeur_avec_tva["valeur_ht"],
+            "valeur_stock_tva": valeur_avec_tva["tva"],
+            "valeur_stock_ttc": valeur_avec_tva["valeur_ttc"],
             "total_articles": len(articles),
             "articles_faibles_count": len(articles_faibles),
             "articles_rupture_count": len(articles_rupture),
